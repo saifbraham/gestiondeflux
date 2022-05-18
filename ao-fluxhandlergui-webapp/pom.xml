@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <artifactId>ao-fluxhandlergui-root</artifactId>
+        <groupId>be.cm.apps</groupId>
+        <version>1.0.29-SNAPSHOT</version>
+        <relativePath>../ao-fluxhandlergui-root</relativePath>
+    </parent>
+    <artifactId>ao-fluxhandlergui-webapp</artifactId>
+    <name>ao-fluxhandlergui-webapp</name>
+    <packaging>war</packaging>
+
+    <build>
+        <resources>
+            <!-- Enable the filtering of resources so that properties ${} are replaced -->
+            <resource>
+                <directory>${basedir}/src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+            <resource>
+                <directory>${basedir}/src/main/java</directory>
+                <includes>
+                    <include>**/*.properties</include>
+                </includes>
+            </resource>
+        </resources>
+        <testResources>
+            <testResource>
+                <directory>${basedir}/src/test/resources</directory>
+                <filtering>true</filtering>
+            </testResource>
+            <testResource>
+                <directory>${basedir}/src/test/java</directory>
+            </testResource>
+        </testResources>
+        <plugins>
+
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>1.2.1</version>
+                <executions>
+                    <execution>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>com.vaadin.sass.SassCompiler</mainClass>
+                            <arguments>
+                                <argument>
+                                    ${project.build.sourceDirectory}/../webapp/VAADIN/themes/LCMVaadinTheme/styles.scss
+                                </argument>
+                                <argument>
+                                    ${project.build.sourceDirectory}/../webapp/VAADIN/themes/LCMVaadinTheme/styles.css
+                                </argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-war-plugin</artifactId>
+                <version>2.2</version>
+                <configuration>
+                    <packagingExcludes>WEB-INF/lib/*.jar</packagingExcludes>
+                    <webResources>
+                        <resource>
+                            <directory>${basedir}/src/main/webapp</directory>
+                        </resource>
+                    </webResources>
+                    <archive>
+                        <manifest>
+                            <addClasspath>true</addClasspath>
+                            <classpathPrefix>/</classpathPrefix>
+                        </manifest>
+                    </archive>
+                    <overlays>
+                        <overlay>
+                            <groupId>be.cm.comps</groupId>
+                            <artifactId>uistandard</artifactId>
+                        </overlay>
+                    </overlays>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <dependencies>
+        <!-- dependencies on other projects -->
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>ao-fluxhandlergui-business</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>ao-fluxhandlergui-properties</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- lcm dependencies -->
+        <dependency>
+            <groupId>be.cm.comps</groupId>
+            <artifactId>logmanager</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>be.cm.comps</groupId>
+            <artifactId>profilemanager</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>be.cm.comps</groupId>
+            <artifactId>uistandard</artifactId>
+            <scope>provided</scope>
+            <type>war</type>
+            <version>${be.cm.comps.uistandard.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>be.cm.comps</groupId>
+            <artifactId>vaadincm</artifactId>
+            <version>${be.cm.comps.vaadincm.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>be.cm.comps</groupId>
+            <artifactId>commons-web</artifactId>
+            <version>${commons-web.version}</version>
+        </dependency>
+
+        <!-- Other project dependencies -->
+
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>supportgui-webapp-commons</artifactId>
+            <version>${supportgui.version}</version>
+            <exclusions>
+                <exclusion>
+                    <artifactId>supportgui-properties</artifactId>
+                    <groupId>${project.groupId}</groupId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- Vaadin dependencies -->
+        <dependency>
+            <groupId>com.vaadin</groupId>
+            <artifactId>vaadin-server</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.vaadin</groupId>
+            <artifactId>vaadin-client-compiled</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.vaadin</groupId>
+            <artifactId>vaadin-client</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.vaadin</groupId>
+            <artifactId>vaadin-themes</artifactId>
+        </dependency>
+
+        <!-- application server dependencies -->
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>servlet-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>be.cm.comps</groupId>
+            <artifactId>commons-test</artifactId>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <artifactId>persistence-api</artifactId>
+                    <groupId>javax.persistence</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>javax.persistence</artifactId>
+                    <groupId>org.eclipse.persistence</groupId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+    </dependencies>
+
+</project>
