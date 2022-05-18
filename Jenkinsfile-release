@@ -1,0 +1,152 @@
+releaseVersion=""
+releaseArtifactId=""
+releaseGroupId=""
+wlDomain=""
+wlApplicationName=""
+wlCluster=""
+applicationType="backend"
+
+developVersion=""
+
+pipeline {
+
+    agent {
+        // todo: agent should be set differently according to environment
+        label 'linux'
+    }
+
+    tools {
+        maven 'Maven 3.3.9'
+        jdk 'jdk 1.8.0_181'
+    }
+
+    environment {
+        RED = '\033[31m'
+        BLUE = '\033[34m'
+        YELLOW = '\033[33m'
+        GREEN = '\033[32m'
+    }
+
+    stages {
+	
+		stage('Init') {
+          steps {
+			ansiColor('xterm') {
+			  sh 'git checkout develop'
+			  sh 'git pull'
+            }
+          }
+		}
+	
+        stage('Release DryRun') {
+            steps {
+                script {
+					ansiColor('xterm') {
+						env.applicationType = applicationType
+						env.skipOsbValidatorPreCheck = skipOsbValidatorPreCheck
+						pom = readMavenPom file: 'pom.xml'
+						env.wlDomain = pom.properties['deployment.wlDomain']
+						env.wlCluster = pom.properties['deployment.wlCluster']
+						env.wlApplicationName = pom.properties['deployment.wlApplicationName']
+
+						sh "mvn -U org.apache.maven.plugins:maven-release-plugin:2.4.2:prepare -DdryRun=true -Dresume=false -Dmaven.test.skip=true -Darguments=-DskipTests"
+						tagpom = readMavenPom file: 'pom.xml.tag'
+						env.releaseVersion = tagpom.getParent().getVersion()
+						env.releaseArtifactId = "${tagpom.getArtifactId()}-ear"
+						env.releaseGroupId = tagpom.getParent().getGroupId()
+						nextpom = readMavenPom file: 'pom.xml.next'
+						env.developVersion = nextpom.getParent().getVersion()
+						echo "${YELLOW}developVersion: ${env.developVersion}"
+						echo "${YELLOW}releaseVersion: ${env.releaseVersion}"
+						echo "${YELLOW}releaseArtifactId: ${env.releaseArtifactId}"
+						echo "${YELLOW}releaseGroupId: ${env.releaseGroupId}"
+						echo "${YELLOW}wlDomain: ${env.wlDomain}"
+						echo "${YELLOW}wlCluster: ${env.wlCluster}"
+						echo "${YELLOW}skipOsbValidatorPreCheck: ${env.skipOsbValidatorPreCheck}"
+						echo "${YELLOW}wlApplicationName: ${env.wlApplicationName}"
+						sh "mvn -U org.apache.maven.plugins:maven-release-plugin:2.4.2:clean -DdryRun=true"
+					}
+                }
+            }
+        }
+	
+        stage('Release version') {
+            when { expression { return env.DryRun == 'false' } }
+            steps {
+                script {
+					ansiColor('xterm') {
+						sh "mvn -B install jgitflow:release-start -DreleaseVersion=${env.releaseVersion} -DdevelopmentVersion=${env.developVersion} jgitflow:release-finish -DreleaseVersion=${env.releaseVersion } -DdevelopmentVersion=${env.developVersion} -Dmaven.test.skip=true"
+					}
+                }
+            }
+        }
+		
+        stage('Push to Git') {
+            when { expression { return env.DryRun == 'false' } }
+            steps {
+                script {
+                    ansiColor('xterm') {
+						sh 'git add --update'
+						sh 'git commit --message \'update poms\''
+						sh 'git push --all'
+						sh 'git push --tag'
+                    }
+                }
+            }
+        }
+		
+        stage('Deploy to devtest') {
+            when { expression { return env.DeployToDevTest == 'true' && env.DryRun == 'false' } }
+            steps {
+                script {
+                    ansiColor('xterm') {
+						build job:'arbeidsongeschiktheid/ao-release/deployment/deploy.to.targeted.env.ear' , parameters:[
+							booleanParam(name: 'DryRun',value:"${env.DryRun}"),
+							string(name: 'Environment',value: 'devtest'),
+							string(name: 'applicationType',value: "${env.applicationType}"),
+							string(name: 'mvnArtifactGroupId',value: "${env.releaseGroupId}"),
+							string(name: 'mvnArtifactId',value: "${env.releaseArtifactId}"),
+							string(name: 'mvnArtifactVersion',value: "${env.releaseVersion}"),
+							string(name: 'wlDomain',value: "${env.wlDomain}"),
+							string(name: 'wlApplicationName',value: "${env.wlApplicationName}"),
+							string(name: 'wlCluster',value: "${env.wlCluster}"),
+							string(name: 'AssystTicket',value: ''),
+							booleanParam(name: 'skipOsbValidatorPreCheck',value: "${env.skipOsbValidatorPreCheck}") ], propagate: true, wait: true
+                    }
+                }
+            }
+        }
+	}
+
+    post {
+        unstable {
+            step(
+                [$class: 'Mailer',
+                    subject: "Unstable Pipeline: ${currentBuild.fullDisplayName}",
+                    body: "Something is wrong with ${env.BUILD_URL}.",
+                    notifyEveryUnstableBuild: true,
+                    recipients: emailextrecipients([
+                        [$class: 'CulpritsRecipientProvider'],
+                        [$class: 'RequesterRecipientProvider'],
+                        [$class: 'FailingTestSuspectsRecipientProvider'],
+                    ])
+                ]
+            )
+        }
+        failure {
+            step(
+                [$class: 'Mailer',
+                    subject: "Broken Pipeline: ${currentBuild.fullDisplayName}",
+                    body: "Something is broken in ${env.BUILD_URL}.",
+                    notifyEveryUnstableBuild: true,
+                    recipients: emailextrecipients([
+                        [$class: 'CulpritsRecipientProvider'],
+                        [$class: 'RequesterRecipientProvider'],
+                        [$class: 'FirstFailingBuildSuspectsRecipientProvider']
+                    ])
+                ]
+            )
+        }
+    }
+
+}
